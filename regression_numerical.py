@@ -1,13 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score
 
 
 class Regression:
 
     title: str = None
 
-    def __init__(self, degree=1, h=0.00001, iterations=300, xrange=[-3, 3]) -> None:
+    def __init__(self, degree=1, h=0.00001, iterations=100, xrange=[-3, 3]) -> None:
         self.h = h
         self.iterations = iterations
         self.xrange = xrange
@@ -19,6 +20,7 @@ class Regression:
         self.y_test = None
         self.args = None
         self.args_pred = None
+        self.mse_errors = None
 
         if isinstance(degree, int):
             if degree < 1:
@@ -64,41 +66,49 @@ class Regression:
         return np.sum((x1 - x2) ** 2) / 2
 
     def fit(self):
-        mse_errors = {}
+        self.mse_errors = {}
         parameters = [0] * (self.degree + 1)
         best_args = best_error = None
         for _ in range(self.iterations):
-
             y_pred = self.process(self.x_train, *parameters)
 
             parameters = self.get_updated_par(y_pred, parameters)
 
-            mse_errors[tuple(parameters)] = self.mse(self.y_train, y_pred)
-            error = mse_errors[tuple(parameters)]
+            self.mse_errors[tuple(parameters)] = self.mse(self.y_train, y_pred)
+            error = self.mse_errors[tuple(parameters)]
+
             if best_error is None or error < best_error:
                 best_error = error
                 best_args = parameters.copy()
 
         self.args_pred = best_args
 
+    def test(self):
+        r2_test = r2_score(self.y_test, self.process(self.x_test, *self.args_pred))
+        print(f"R2 = {r2_test} - on test set")
+        return r2_test
+
     def plot(self):
-        print(f"Real model parameters: {self.args}")
+        print(f"Real model parameters: {list(self.args)}")
         print(f"Estimated model parameters: {self.args_pred}")
+        r2_train = r2_score(self.y_train, self.process(self.x_train, *self.args_pred))
+        print(f"R2 = {r2_train} - on training set")
 
-        x_test = np.linspace(*self.xrange, num=300)
-        y_test = self.process(x_test, *self.args_pred)
+        x_plot = np.linspace(*self.xrange, num=300)
+        y_plot = self.process(x_plot, *self.args_pred)
 
-        y_process = self.process(x_test, *self.args, degree=len(self.args))
+        y_process = self.process(x_plot, *self.args, degree=len(self.args))
 
-        plt.figure(figsize=(8, 6))
+        plt.figure(figsize=(14, 6))
+        plt.subplot(1, 2, 1)
         plt.title(self.title + " Regression")
         plt.scatter(self.x_train, self.y_train, s=5.0, label="Data")
         plt.plot(
-            x_test, y_process, color="orange", linewidth=3.5, label="Process", alpha=0.5
+            x_plot, y_process, color="orange", linewidth=3.5, label="Process", alpha=0.5
         )
         plt.plot(
-            x_test,
-            y_test,
+            x_plot,
+            y_plot,
             color="red",
             linewidth=2.5,
             alpha=0.8,
@@ -108,11 +118,24 @@ class Regression:
         plt.ylabel("y")
         plt.legend(shadow=True)
         plt.grid()
+
+        plt.subplot(1, 2, 2)
+        plt.title("Cost function")
+        plt.plot(
+            range(len(self.mse_errors)),
+            self.mse_errors.values(),
+            color="orange",
+            label="MSE",
+        )
+        plt.xlabel("Iteration")
+        plt.ylabel("MSE")
+        plt.grid()
         plt.show()
 
 
-model_lin = Regression(degree=2, h=0.00001, iterations=300, xrange=[-3, 3])
+model = Regression(degree=2, h=0.0001, iterations=100, xrange=[-3, 3])
 
-model_lin.make_dataset(-31, -1, 15, n_samples=500)
-model_lin.fit()
-model_lin.plot()
+model.make_dataset(6, -7, 12, n_samples=500, sigma=10)
+model.fit()
+model.plot()
+model.test()
